@@ -1,79 +1,90 @@
-#include <Servo.h>          //Servo motor library. This is standard library
-#include <NewPing.h>        //Ultrasonic sensor function library. You must install this library
+#include <Servo.h>
+#include <NewPing.h>
 
-//our L298N control pins
-const int LeftMotorForward = 7;
-const int LeftMotorBackward = 6;
-const int RightMotorForward = 5;
-const int RightMotorBackward = 4;
+// --- CONFIGURATION SECTION (Change things here easily) ---
+// Motor Pins
+const int LeftMotorForward  = 2;
+const int LeftMotorBackward = 3;
+const int RightMotorForward = 4;
+const int RightMotorBackward = 5;
 
-//sensor pins
-#define trig_pin A1 //analog input 1
-#define echo_pin A2 //analog input 2
+// Sensor Pins
+const int trig_pin = A1;
+const int echo_pin = A2;
+const int maximum_distance = 200;
 
-#define maximum_distance 100
-boolean goesForward = false;
-int distance = 100;
+// Bluetooth / Alert Pins
+const int ledPin    = 13; // Visual indicator
+const int buzzerPin = 12; // Audio alert
 
-NewPing sonar(trig_pin, echo_pin, maximum_distance); //sensor function
-Servo servo_motor; //our servo name
+// Settings
+int speedSet     = 180; // Motor speed (0-255)
+int safeDistance = 30;  // Distance to trigger avoidance (cm)
 
+// Objects
+Servo servo_motor;
+NewPing sonar(trig_pin, echo_pin, maximum_distance);
 
-void setup(){
-
+void setup() {
   pinMode(RightMotorForward, OUTPUT);
   pinMode(LeftMotorForward, OUTPUT);
   pinMode(LeftMotorBackward, OUTPUT);
   pinMode(RightMotorBackward, OUTPUT);
-  
-  servo_motor.attach(10); //our servo pin
+  pinMode(ledPin, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
 
-  servo_motor.write(115);
+  servo_motor.attach(11); // Servo on pin 11
+  servo_motor.write(115); // Center position
   delay(2000);
-  distance = readPing();
-  delay(100);
-  distance = readPing();
-  delay(100);
-  distance = readPing();
-  delay(100);
-  distance = readPing();
-  delay(100);
+  
+  digitalWrite(ledPin, HIGH); // System ready
 }
 
-void loop(){
+void loop() {
+  int distance = readPing();
 
-  int distanceRight = 0;
-  int distanceLeft = 0;
-  delay(50);
-
-  if (distance <= 35){
+  if (distance <= safeDistance) {
     moveStop();
+    alertSound(); // Beep when obstacle detected
     delay(300);
     moveBackward();
     delay(400);
     moveStop();
+    
+    int distanceRight = lookRight();
     delay(300);
-    distanceRight = lookRight();
-    delay(300);
-    distanceLeft = lookLeft();
+    int distanceLeft = lookLeft();
     delay(300);
 
-    if (distance >= distanceLeft){
+    if (distanceRight >= distanceLeft) {
       turnRight();
       moveStop();
-    }
-    else{
+    } else {
       turnLeft();
       moveStop();
     }
+  } else {
+    moveForward();
   }
-  else{
-    moveForward(); 
-  }
-    distance = readPing();
 }
 
-int lookRight(){  
+// --- HELPER FUNCTIONS ---
+
+int readPing() {
+  delay(70);
+  int cm = sonar.ping_cm();
+  if (cm == 0) cm = 250;
+  return cm;
+}
+
+void alertSound() {
+  digitalWrite(ledPin, LOW);
+  tone(buzzerPin, 1000, 200); // 1kHz tone for 200ms
+  delay(100);
+  digitalWrite(ledPin, HIGH);
+}
+
+int lookRight() {  
   servo_motor.write(50);
   delay(500);
   int distance = readPing();
@@ -82,92 +93,50 @@ int lookRight(){
   return distance;
 }
 
-int lookLeft(){
+int lookLeft() {
   servo_motor.write(170);
   delay(500);
   int distance = readPing();
   delay(100);
   servo_motor.write(115);
   return distance;
-  delay(100);
 }
 
-int readPing(){
-  delay(70);
-  int cm = sonar.ping_cm();
-  if (cm==0){
-    cm=250;
-  }
-  return cm;
-}
-
-void moveStop(){
-  
+void moveStop() {
   digitalWrite(RightMotorForward, LOW);
   digitalWrite(LeftMotorForward, LOW);
   digitalWrite(RightMotorBackward, LOW);
   digitalWrite(LeftMotorBackward, LOW);
 }
 
-void moveForward(){
-
-  if(!goesForward){
-
-    goesForward=true;
-    
-    digitalWrite(LeftMotorForward, HIGH);
-    digitalWrite(RightMotorForward, HIGH);
-  
-    digitalWrite(LeftMotorBackward, LOW);
-    digitalWrite(RightMotorBackward, LOW); 
-  }
+void moveForward() {
+  digitalWrite(LeftMotorForward, HIGH);
+  digitalWrite(RightMotorForward, HIGH);
+  digitalWrite(LeftMotorBackward, LOW);
+  digitalWrite(RightMotorBackward, LOW);
 }
 
-void moveBackward(){
-
-  goesForward=false;
-
+void moveBackward() {
   digitalWrite(LeftMotorBackward, HIGH);
   digitalWrite(RightMotorBackward, HIGH);
-  
   digitalWrite(LeftMotorForward, LOW);
   digitalWrite(RightMotorForward, LOW);
-  
 }
 
-void turnRight(){
-
+void turnRight() {
   digitalWrite(LeftMotorForward, HIGH);
   digitalWrite(RightMotorBackward, HIGH);
-  
   digitalWrite(LeftMotorBackward, LOW);
   digitalWrite(RightMotorForward, LOW);
-  
-  delay(250);
-  
-  digitalWrite(LeftMotorForward, HIGH);
-  digitalWrite(RightMotorForward, HIGH);
-  
-  digitalWrite(LeftMotorBackward, LOW);
-  digitalWrite(RightMotorBackward, LOW);
- 
-  
-  
+  delay(500);
+  moveForward();
 }
 
-void turnLeft(){
-
+void turnLeft() {
   digitalWrite(LeftMotorBackward, HIGH);
   digitalWrite(RightMotorForward, HIGH);
-  
   digitalWrite(LeftMotorForward, LOW);
   digitalWrite(RightMotorBackward, LOW);
-
-  delay(250);
-  
-  digitalWrite(LeftMotorForward, HIGH);
-  digitalWrite(RightMotorForward, HIGH);
-  
-  digitalWrite(LeftMotorBackward, LOW);
-  digitalWrite(RightMotorBackward, LOW);
+  delay(500);
+  moveForward();
 }
